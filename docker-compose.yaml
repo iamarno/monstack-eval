@@ -1,0 +1,153 @@
+version: '3.8'
+
+networks:
+  monitoring:
+    driver: bridge
+    
+volumes:
+  grafana_data: {}
+  grafana_provisioning: {}
+  prometheus_data: {}
+
+services:
+  nginx:
+    container_name: nginx
+    build: ./nginx
+    ports:
+      - 80:80
+      - 443:443
+    depends_on:
+      - grafana
+    networks:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana-oss-dev:9.2.0-78018pre
+    container_name: grafana
+    ports:
+      - 3000:3000
+    user: '1000'
+    volumes:
+      - ./grafana_data:/var/lib/grafana
+      - ./grafana_provisioning:/var/lib/grafana/dashboards
+      - ./grafana_provisioning:/etc/grafana/provisioning
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+      - loki
+
+  node-exporter:
+    image: prom/node-exporter:v1.4.0-rc.0
+    container_name: node-exporter
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host:ro,rslave
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+#      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - 9100:9100
+    networks:
+      - monitoring
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.22.0
+    container_name: blackbox_exporter
+    restart: unless-stopped
+    privileged: true
+#    volumes:
+#      - ./blackbox-exporter.yml:/etc/blackbox-exporter/blackbox-exporter.yml
+#    command: --config.file=/etc/blackbox-exporter/blackbox-exporter.yml
+    ports:
+      - 9115:9115
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+
+  prometheus:
+    image: prom/prometheus:v2.38.0
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    user: '1000'
+    networks:
+      - monitoring
+
+  alertmanager:
+    image: prom/alertmanager:v0.24.0
+    container_name: alertmanager
+    restart: unless-stopped
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+    ports:
+      - "9093:9093"
+    networks:
+      - monitoring       
+
+  loki:
+    image: grafana/loki:2.6.1
+    container_name: loki
+    ports:
+      - 3100:3100
+    command: -config.file=/etc/loki/loki.yml
+    volumes:
+      - ./loki.yml:/etc/loki/loki.yml
+    networks:
+      - monitoring
+
+  promtail:
+    image: grafana/promtail:2.6.1
+    container_name: promtail
+    volumes:
+      - ./promtail.yml:/etc/promtail/config.yml
+      - /var/log:/var/log
+      - /var/log/redfact:/var/log/redfact
+      - /var/log/journal:/var/log/journal
+      - /run/log/journal:/run/log/journal
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - monitoring
+    depends_on:
+      - loki
+
+### CAUTION
+### this generates useless artificial logs for 
+### demonstration and testing purposes only 
+### DISABLE IN PRODUCTION
+
+  log-generator:
+    image: mingrammer/flog
+    container_name: flog
+    restart: unless-stopped
+    command:
+      - --loop
+      - --format=apache_common
+      - --number=5000    # number of log lines to generate per second
+      - --delay=100ms  # delay between log lines
+      - --output=/var/log/apache/generated-logs.log
+      - --overwrite
+      - --type=log
+    volumes:
+      - /var/log/apache:/var/log/apache
+    depends_on:
+      - promtail
