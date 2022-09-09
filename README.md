@@ -23,7 +23,7 @@ git clone git@github.com:iamarno/monstack-eval.git
 cd monstack-eval && mkdir prometheus_data grafana_data
 ```
 3. replace UID in `docker-compose.yaml` with the UID of the user executing `docker-compose up` (next step).
-show your uid by entering `echo $UID` into the terminal
+show your UID by entering `echo $UID` into the terminal
 ```
 user: '1000' <- replace with your user UID
 ```
@@ -54,7 +54,7 @@ send test alert to alertmanager (from localhost)
 curl -H 'Content-Type: application/json' -d '[{"labels":{"alertname":"testalert"}}]' http://localhost:9093/api/v1/alerts
 ```
 
-setup telegram bot in `alertmanager.yml` to recieve alerts via telegram
+setup telegram bot in `alertmanager.yml` to receive alerts via telegram
 ```
 bot_token: 1234561111111111222222222233333333334444444444 # insert your bot_token here
 chat_id: -123456789 # insert your chat_id here
