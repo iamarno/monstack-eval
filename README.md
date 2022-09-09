@@ -1,6 +1,6 @@
 # monstack
 
-start grafana with datasources and dashboards already provisioned, prometheus, alertmanager, loki, promtail, flog and nginx as reverse proxy with a single docker composer file
+start grafana with datasources and dashboards already provisioned, prometheus, alertmanager, loki, promtail, flog and nginx as reverse proxy with a single docker compose file
 
 # disclaimer
 
